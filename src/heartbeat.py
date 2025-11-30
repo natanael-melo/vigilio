@@ -15,22 +15,24 @@ logger = logging.getLogger(__name__)
 class Heartbeat:
     """Classe para gerenciar envio de heartbeats para n8n"""
     
-    def __init__(self, webhook_url: str, timeout: int = 10):
+    def __init__(self, webhook_url: str, timeout: int = 10, agent_name: str = ""):
         """
         Inicializa o sistema de heartbeat
         
         Args:
             webhook_url: URL do webhook n8n
             timeout: Timeout para requisições em segundos
+            agent_name: Nome personalizado do agente (opcional)
         """
         self.webhook_url = webhook_url
         self.timeout = timeout
-        self.hostname = self._get_hostname()
+        self.hostname = agent_name if agent_name else self._get_hostname()
         self.consecutive_failures = 0
         self.total_sent = 0
         self.total_failed = 0
         
         logger.info(f"Heartbeat configurado para {webhook_url}")
+        logger.info(f"Nome do agente: {self.hostname}")
     
     def _get_hostname(self) -> str:
         """

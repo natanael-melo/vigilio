@@ -33,8 +33,18 @@ services:
       # === TIMEZONE (OPCIONAL) ===
       - TZ=America/Sao_Paulo
       
-      # === CONTAINERS MONITORADOS (OPCIONAL) ===
-      # Separe por vírgula: exemplo "postgres,nginx,redis"
+      # === NOME DO AGENTE (OPCIONAL) ===
+      # Nome que aparece nas mensagens (padrão: hostname do servidor)
+      - AGENT_NAME=
+      
+      # === MONITORAMENTO DE CONTAINERS (OPCIONAL) ===
+      # Monitora TODOS os containers automaticamente? (true/false)
+      - WATCH_ALL_CONTAINERS=true
+      
+      # Containers para IGNORAR (separados por vírgula)
+      - IGNORE_CONTAINERS=
+      
+      # Containers específicos (apenas se WATCH_ALL_CONTAINERS=false)
       - WATCH_CONTAINERS=
       
       # === LIMIARES DE ALERTA (OPCIONAL) ===

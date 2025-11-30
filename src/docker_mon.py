@@ -14,14 +14,20 @@ logger = logging.getLogger(__name__)
 class DockerMonitor:
     """Classe responsável por monitorar containers Docker"""
     
-    def __init__(self, watch_containers: List[str] = None):
+    def __init__(self, watch_containers: List[str] = None, 
+                 watch_all: bool = True,
+                 ignore_containers: List[str] = None):
         """
         Inicializa o monitor Docker
         
         Args:
             watch_containers: Lista de nomes de containers para monitoramento prioritário
+            watch_all: Se True, monitora TODOS os containers (exceto ignorados)
+            ignore_containers: Lista de containers para ignorar no monitoramento automático
         """
         self.watch_containers = watch_containers or []
+        self.watch_all = watch_all
+        self.ignore_containers = ignore_containers or []
         self.client: Optional[docker.DockerClient] = None
         self._connect()
     
@@ -170,15 +176,11 @@ class DockerMonitor:
     
     def check_watched_containers(self) -> List[Dict[str, Any]]:
         """
-        Verifica o status dos containers prioritários
+        Verifica o status dos containers monitorados
         
         Returns:
             Lista de alertas para containers com problemas
         """
-        if not self.watch_containers:
-            logger.debug("Nenhum container configurado para monitoramento prioritário")
-            return []
-        
         if not self.is_connected():
             return [{
                 "type": "DOCKER_CONNECTION_ERROR",
@@ -192,7 +194,23 @@ class DockerMonitor:
         # Cria um mapa de containers por nome
         container_map = {c["name"]: c for c in all_containers}
         
-        for watched_name in self.watch_containers:
+        # Define quais containers monitorar
+        if self.watch_all:
+            # Monitora TODOS, exceto os ignorados
+            containers_to_check = [
+                name for name in container_map.keys() 
+                if name not in self.ignore_containers
+            ]
+            logger.debug(f"Monitorando TODOS os containers (exceto: {self.ignore_containers})")
+        else:
+            # Monitora apenas os especificados
+            containers_to_check = self.watch_containers
+            if not containers_to_check:
+                logger.debug("Nenhum container configurado para monitoramento")
+                return []
+            logger.debug(f"Monitorando containers específicos: {containers_to_check}")
+        
+        for watched_name in containers_to_check:
             if watched_name not in container_map:
                 # Container não encontrado
                 alerts.append({
@@ -246,19 +264,45 @@ class DockerMonitor:
             
             summary = f"🐳 *Docker:* {len(running)} rodando / {len(stopped)} parados"
             
-            # Se há containers monitorados, detalha
-            if self.watch_containers:
-                watched_status = []
-                for name in self.watch_containers:
-                    container = next((c for c in all_containers if c["name"] == name), None)
-                    if container:
-                        emoji = "🟢" if container["status"] == "running" else "🔴"
-                        watched_status.append(f"{emoji} {name}")
-                    else:
-                        watched_status.append(f"❌ {name}")
+            # Determina quais containers exibir
+            if self.watch_all:
+                # Mostra TODOS os containers (exceto ignorados)
+                containers_to_show = [
+                    c for c in all_containers 
+                    if c["name"] not in self.ignore_containers
+                ]
                 
-                if watched_status:
-                    summary += "\n\n*Monitorados:*\n" + "\n".join(watched_status)
+                if containers_to_show:
+                    summary += "\n\n*Status dos Containers:*"
+                    for container in sorted(containers_to_show, key=lambda x: x["name"]):
+                        emoji = "🟢" if container["status"] == "running" else "🔴"
+                        health = ""
+                        if "health" in container:
+                            if container["health"] == "healthy":
+                                health = " ✓"
+                            elif container["health"] == "unhealthy":
+                                health = " ⚠️"
+                        summary += f"\n{emoji} {container['name']}{health}"
+            else:
+                # Mostra apenas os monitorados específicos
+                if self.watch_containers:
+                    watched_status = []
+                    for name in self.watch_containers:
+                        container = next((c for c in all_containers if c["name"] == name), None)
+                        if container:
+                            emoji = "🟢" if container["status"] == "running" else "🔴"
+                            health = ""
+                            if "health" in container:
+                                if container["health"] == "healthy":
+                                    health = " ✓"
+                                elif container["health"] == "unhealthy":
+                                    health = " ⚠️"
+                            watched_status.append(f"{emoji} {name}{health}")
+                        else:
+                            watched_status.append(f"❌ {name}")
+                    
+                    if watched_status:
+                        summary += "\n\n*Monitorados:*\n" + "\n".join(watched_status)
             
             return summary
             

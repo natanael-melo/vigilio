@@ -28,7 +28,12 @@ services:
       # Timezone
       - TZ=${TZ:-America/Sao_Paulo}
       
-      # Containers para Monitorar (separados por vírgula)
+      # Nome Personalizado do Agente
+      - AGENT_NAME=${AGENT_NAME:-}
+      
+      # Monitoramento de Containers
+      - WATCH_ALL_CONTAINERS=${WATCH_ALL_CONTAINERS:-true}
+      - IGNORE_CONTAINERS=${IGNORE_CONTAINERS:-}
       - WATCH_CONTAINERS=${WATCH_CONTAINERS:-}
       
       # Limiares de Alerta (opcional)

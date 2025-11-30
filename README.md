@@ -18,6 +18,9 @@
 - 🛡️ **Robusto**: Loop resistente a falhas de rede
 - 📦 **Fácil Deploy**: Pronto para Portainer
 
+> 📖 **[Guia Completo de Mensagens e Payloads →](MESSAGES_GUIDE.md)**  
+> Documentação detalhada de todas as mensagens WhatsApp e payloads do webhook
+
 ---
 
 ## 🏗️ Arquitetura
@@ -347,7 +350,14 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 - 📧 Email: suporte@vigilo.com
 - 💬 Discord: [Link do Discord]
-- 📚 Docs: [docs.vigilo.com]
+
+## 📚 Documentação Completa
+
+- 📖 [README.md](README.md) - Visão geral e instalação
+- 🚀 [QUICK_START.md](QUICK_START.md) - Início rápido em 5 minutos  
+- 📱 [MESSAGES_GUIDE.md](MESSAGES_GUIDE.md) - **Guia de mensagens e payloads**
+- 🏗️ [ARCHITECTURE.md](ARCHITECTURE.md) - Arquitetura técnica detalhada
+- 📊 [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) - Resumo executivo
 
 ---
 

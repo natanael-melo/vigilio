@@ -31,11 +31,26 @@ class Config:
         # Timezone
         self.TZ: str = os.getenv("TZ", "America/Sao_Paulo")
         
-        # Containers para monitoramento prioritário
+        # Nome personalizado do agente (aparece nas mensagens)
+        self.AGENT_NAME: str = os.getenv("AGENT_NAME", "")
+        
+        # Modo de monitoramento de containers
+        self.WATCH_ALL_CONTAINERS: bool = os.getenv("WATCH_ALL_CONTAINERS", "true").lower() == "true"
+        
+        # Containers para monitoramento prioritário (apenas se WATCH_ALL_CONTAINERS=false)
         watch_containers_str: str = os.getenv("WATCH_CONTAINERS", "")
         self.WATCH_CONTAINERS: List[str] = [
             c.strip() for c in watch_containers_str.split(",") if c.strip()
         ]
+        
+        # Containers para IGNORAR no monitoramento automático
+        ignore_containers_str: str = os.getenv("IGNORE_CONTAINERS", "")
+        self.IGNORE_CONTAINERS: List[str] = [
+            c.strip() for c in ignore_containers_str.split(",") if c.strip()
+        ]
+        # Sempre ignora o próprio container do Vigilo
+        if "vigilo-agent" not in self.IGNORE_CONTAINERS:
+            self.IGNORE_CONTAINERS.append("vigilo-agent")
         
         # Limiares de alerta para recursos do host
         self.CPU_THRESHOLD: float = float(os.getenv("CPU_THRESHOLD", "85.0"))
@@ -107,7 +122,10 @@ class Config:
         return (
             f"Config(CHECK_INTERVAL={self.CHECK_INTERVAL}, "
             f"REPORT_HOURS={self.REPORT_HOURS}, "
+            f"WATCH_ALL_CONTAINERS={self.WATCH_ALL_CONTAINERS}, "
             f"WATCH_CONTAINERS={self.WATCH_CONTAINERS}, "
+            f"IGNORE_CONTAINERS={self.IGNORE_CONTAINERS}, "
+            f"AGENT_NAME={self.AGENT_NAME or 'auto'}, "
             f"TZ={self.TZ})"
         )
 

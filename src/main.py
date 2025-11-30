@@ -46,7 +46,9 @@ class VigiloAgent:
         )
         
         self.docker_monitor = DockerMonitor(
-            watch_containers=config.WATCH_CONTAINERS
+            watch_containers=config.WATCH_CONTAINERS,
+            watch_all=config.WATCH_ALL_CONTAINERS,
+            ignore_containers=config.IGNORE_CONTAINERS
         )
         
         self.notifier = Notifier(
@@ -58,7 +60,8 @@ class VigiloAgent:
         )
         
         self.heartbeat = Heartbeat(
-            webhook_url=config.N8N_HEARTBEAT_URL
+            webhook_url=config.N8N_HEARTBEAT_URL,
+            agent_name=config.AGENT_NAME
         )
         
         # Controle de execução
@@ -72,13 +75,23 @@ class VigiloAgent:
         
         logger.info(f"Configuração: Checagem a cada {config.CHECK_INTERVAL}s")
         logger.info(f"Relatórios a cada {config.REPORT_HOURS}h")
-        logger.info(f"Containers monitorados: {config.WATCH_CONTAINERS or 'Nenhum'}")
+        
+        if config.WATCH_ALL_CONTAINERS:
+            logger.info(f"Modo: Monitorando TODOS os containers")
+            if config.IGNORE_CONTAINERS:
+                logger.info(f"Ignorando: {config.IGNORE_CONTAINERS}")
+        else:
+            logger.info(f"Modo: Monitorando containers específicos")
+            logger.info(f"Containers monitorados: {config.WATCH_CONTAINERS or 'Nenhum'}")
         
         # Testa conexões
         self._test_connections()
         
         # Envia notificação de startup
         self._send_startup_notifications()
+        
+        # Envia relatório inicial logo após inicialização
+        self._send_initial_report()
     
     def _signal_handler(self, signum, frame):
         """
@@ -122,6 +135,35 @@ class VigiloAgent:
         
         # Envia evento de startup para n8n
         self.heartbeat.send_startup_event()
+    
+    def _send_initial_report(self) -> None:
+        """Envia relatório inicial logo após a inicialização"""
+        try:
+            logger.info("📊 Gerando relatório inicial...")
+            
+            # Aguarda 2 segundos para dar tempo do sistema estabilizar
+            import time
+            time.sleep(2)
+            
+            # Coleta estatísticas
+            system_stats = self.system_monitor.get_system_stats()
+            
+            # Gera relatório completo
+            report = self._generate_full_report(system_stats)
+            
+            # Adiciona cabeçalho especial para relatório inicial
+            initial_header = "🚀 *RELATÓRIO INICIAL*\n\n"
+            report_with_header = initial_header + report
+            
+            # Envia via WhatsApp
+            if self.notifier.send_report(report_with_header):
+                logger.info("✅ Relatório inicial enviado com sucesso")
+            else:
+                logger.warning("⚠️ Falha ao enviar relatório inicial")
+                
+        except Exception as e:
+            logger.error(f"Erro ao enviar relatório inicial: {e}")
+            # Não interrompe a inicialização se falhar
     
     def _should_send_report(self) -> bool:
         """
