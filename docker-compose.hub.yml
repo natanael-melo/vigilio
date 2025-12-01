@@ -1,0 +1,78 @@
+version: '3.8'
+
+# ============================================
+# Docker Compose - Usando imagem do Docker Hub
+# ============================================
+# Use este arquivo para deploy em outras VPS
+# Comando: docker-compose -f docker-compose.hub.yml up -d
+
+services:
+  vigilo:
+    # Imagem do Docker Hub (altere "seu_usuario" para o seu)
+    image: natanaelmelo/vigilo:latest
+    
+    container_name: vigilo-agent
+    restart: unless-stopped
+    
+    # Variáveis de Ambiente (Configure aqui ou use arquivo .env)
+    environment:
+      # Evolution API (WhatsApp)
+      - EVOLUTION_URL=https://evolutionapi.flyontech.online
+      - EVOLUTION_TOKEN=LSZYChbw0zW2GTiZo2UdsoAGaV7C7dS2
+      - EVOLUTION_INSTANCE=Profissional
+      - NOTIFY_NUMBER=120363423550978478@g.us
+      
+      # n8n Webhook
+      - N8N_HEARTBEAT_URL=https://n8n.flyontech.online/webhook/b7cef983-9b15-4cdd-8efb-7b059b7a6019
+      
+      # Configurações de Tempo
+      - CHECK_INTERVAL=60
+      - REPORT_HOURS=4
+      - ALERT_COOLDOWN=1800
+      
+      # Timezone
+      - TZ=America/Sao_Paulo
+      
+      # Nome Personalizado do Agente (IMPORTANTE: defina para cada VPS)
+      - AGENT_NAME=Infra Chat Rank
+      
+      # Monitoramento de Containers
+      - WATCH_ALL_CONTAINERS=true}
+      - IGNORE_CONTAINERS=
+      - WATCH_CONTAINERS=
+      
+      # Limiares de Alerta (opcional)
+      - CPU_THRESHOLD=85.0
+      - RAM_THRESHOLD=90.0
+      - DISK_THRESHOLD=90.0
+      
+      # Log Level
+      - LOG_LEVEL=INFO
+    
+    # Volumes
+    volumes:
+      # Docker Socket (Read-Only) - ESSENCIAL para monitoramento
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # Timezone (sincroniza com host)
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    
+    # Network mode para ter acesso total ao host
+    network_mode: bridge
+    
+    # Labels para Portainer
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "app.name=vigilo"
+      - "app.description=Lightweight Monitoring Agent"
+      - "app.version=1.1.0"
+    
+    # Logging driver
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
