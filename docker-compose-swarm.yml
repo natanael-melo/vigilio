@@ -1,0 +1,94 @@
+version: '3.8'
+
+# =====================================================
+# Docker Compose para Deploy em SWARM MODE
+# =====================================================
+# Este arquivo configura o Vigilo para rodar em todos
+# os nodes do Docker Swarm usando deploy mode: global
+#
+# Deploy: docker stack deploy -c docker-compose-swarm.yml vigilo
+# =====================================================
+
+services:
+  vigilo:
+    image: ${VIGILO_IMAGE:-ghcr.io/seu-usuario/vigilo:latest}
+
+    # Deploy em modo global = roda em TODOS os nodes do swarm
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+      # Roda em qualquer node (manager ou worker)
+      placement:
+        constraints: []
+
+    # Variáveis de Ambiente
+    environment:
+      # Evolution API (WhatsApp)
+      - EVOLUTION_URL=${EVOLUTION_URL}
+      - EVOLUTION_TOKEN=${EVOLUTION_TOKEN}
+      - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE}
+      - NOTIFY_NUMBER=${NOTIFY_NUMBER}
+
+      # n8n Webhook (MESMO URL para todos os agents)
+      - N8N_HEARTBEAT_URL=${N8N_HEARTBEAT_URL}
+
+      # Configurações de Tempo
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-60}
+      - REPORT_HOURS=${REPORT_HOURS:-4}
+      - ALERT_COOLDOWN=${ALERT_COOLDOWN:-1800}
+
+      # Timezone
+      - TZ=${TZ:-America/Sao_Paulo}
+
+      # Nome do Agente - usa hostname do node automaticamente em swarm
+      # Deixe vazio para usar o hostname real de cada VPS
+      - AGENT_NAME=${AGENT_NAME:-}
+
+      # Monitoramento de Containers
+      - WATCH_ALL_CONTAINERS=${WATCH_ALL_CONTAINERS:-true}
+      - IGNORE_CONTAINERS=${IGNORE_CONTAINERS:-vigilo_vigilo}
+      - WATCH_CONTAINERS=${WATCH_CONTAINERS:-}
+
+      # Limiares de Alerta
+      - CPU_THRESHOLD=${CPU_THRESHOLD:-85.0}
+      - RAM_THRESHOLD=${RAM_THRESHOLD:-90.0}
+      - DISK_THRESHOLD=${DISK_THRESHOLD:-90.0}
+
+      # Log Level
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    # Volumes
+    volumes:
+      # Docker Socket - ESSENCIAL para monitoramento do Swarm
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Timezone
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+
+    # Network - usar rede overlay para comunicação entre nodes
+    networks:
+      - vigilo-net
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  vigilo-net:
+    driver: overlay
+    attachable: true

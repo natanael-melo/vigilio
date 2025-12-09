@@ -13,6 +13,7 @@ from typing import Optional
 from config import config
 from system_mon import SystemMonitor
 from docker_mon import DockerMonitor
+from swarm_mon import SwarmMonitor
 from notifier import Notifier
 from heartbeat import Heartbeat
 
@@ -50,7 +51,9 @@ class VigiloAgent:
             watch_all=config.WATCH_ALL_CONTAINERS,
             ignore_containers=config.IGNORE_CONTAINERS
         )
-        
+
+        self.swarm_monitor = SwarmMonitor()
+
         self.notifier = Notifier(
             evolution_url=config.EVOLUTION_URL,
             evolution_token=config.EVOLUTION_TOKEN,
@@ -125,6 +128,16 @@ class VigiloAgent:
             logger.info("✅ Docker: Conectado")
         else:
             logger.error("❌ Docker: NÃO conectado - Verifique o socket!")
+
+        # Verifica Swarm
+        if self.swarm_monitor.is_swarm_active:
+            role = "Manager" if self.swarm_monitor.is_manager else "Worker"
+            logger.info(f"✅ Docker Swarm: Ativo ({role})")
+            if self.swarm_monitor.is_manager:
+                swarm_info = self.swarm_monitor.get_swarm_info()
+                logger.info(f"   Cluster: {swarm_info.get('nodes', 0)} nodes, {swarm_info.get('managers', 0)} managers")
+        else:
+            logger.info("ℹ️ Docker Swarm: Não ativo (modo standalone)")
     
     def _send_startup_notifications(self) -> None:
         """Envia notificações de inicialização"""
@@ -181,19 +194,24 @@ class VigiloAgent:
     def _generate_full_report(self, system_stats: dict) -> str:
         """
         Gera um relatório completo do sistema
-        
+
         Args:
             system_stats: Estatísticas do sistema
-            
+
         Returns:
             Relatório formatado
         """
         # Relatório do sistema
         system_report = self.system_monitor.get_formatted_report(system_stats)
-        
+
         # Relatório do Docker
         docker_report = self.docker_monitor.get_docker_summary()
-        
+
+        # Relatório do Swarm (se ativo)
+        swarm_report = ""
+        if self.swarm_monitor.is_swarm_active:
+            swarm_report = "\n\n" + self.swarm_monitor.get_swarm_summary()
+
         # Estatísticas do agente
         heartbeat_stats = self.heartbeat.get_stats()
         agent_info = f"""
@@ -203,30 +221,33 @@ class VigiloAgent:
 ❌ Falhas heartbeat: {heartbeat_stats['total_failed']}
 📊 Taxa de sucesso: {heartbeat_stats['success_rate']}%
 """
-        
-        full_report = f"{system_report}\n\n{docker_report}\n{agent_info}"
-        
+
+        full_report = f"{system_report}\n\n{docker_report}{swarm_report}\n{agent_info}"
+
         return full_report
     
-    def _process_alerts(self, system_alerts: list, docker_alerts: list) -> None:
+    def _process_alerts(self, system_alerts: list, docker_alerts: list,
+                        swarm_alerts: list = None) -> None:
         """
         Processa e envia alertas detectados
-        
+
         Args:
             system_alerts: Lista de alertas do sistema
             docker_alerts: Lista de alertas do Docker
+            swarm_alerts: Lista de alertas do Swarm (opcional)
         """
-        all_alerts = system_alerts + docker_alerts
-        
+        swarm_alerts = swarm_alerts or []
+        all_alerts = system_alerts + docker_alerts + swarm_alerts
+
         if not all_alerts:
             return
-        
+
         logger.warning(f"⚠️ Detectados {len(all_alerts)} alertas")
-        
+
         # Envia alertas via WhatsApp
         sent_count = self.notifier.send_alerts(all_alerts)
         logger.info(f"📱 {sent_count}/{len(all_alerts)} alertas enviados via WhatsApp")
-        
+
         # Notifica n8n sobre os alertas
         alert_types = [alert.get("type", "UNKNOWN") for alert in all_alerts]
         self.heartbeat.send_alert_event(len(all_alerts), alert_types)
@@ -236,36 +257,43 @@ class VigiloAgent:
         try:
             self.check_count += 1
             logger.info(f"🔍 Checagem #{self.check_count}")
-            
+
             # 1. Coleta estatísticas do sistema
             system_stats = self.system_monitor.get_system_stats()
-            
+
             # 2. Verifica limiares do sistema
             system_alerts = self.system_monitor.check_thresholds(system_stats)
-            
+
             # 3. Verifica containers Docker
             docker_alerts = self.docker_monitor.check_watched_containers()
-            
-            # 4. Processa alertas
-            if system_alerts or docker_alerts:
-                self._process_alerts(system_alerts, docker_alerts)
+
+            # 4. Verifica saúde do Swarm (se ativo e for manager)
+            swarm_alerts = []
+            swarm_data = None
+            if self.swarm_monitor.is_swarm_active:
+                swarm_alerts = self.swarm_monitor.check_swarm_health()
+                swarm_data = self.swarm_monitor.get_full_swarm_data()
+
+            # 5. Processa alertas
+            if system_alerts or docker_alerts or swarm_alerts:
+                self._process_alerts(system_alerts, docker_alerts, swarm_alerts)
             else:
                 logger.info("✅ Sistema OK - Nenhum alerta")
-            
-            # 5. Envia heartbeat para n8n
-            self.heartbeat.send(stats=system_stats)
-            
-            # 6. Verifica se deve enviar relatório periódico
+
+            # 6. Envia heartbeat para n8n (com dados do Swarm)
+            self.heartbeat.send(stats=system_stats, swarm_data=swarm_data)
+
+            # 7. Verifica se deve enviar relatório periódico
             if self._should_send_report():
                 logger.info("📊 Enviando relatório periódico...")
                 report = self._generate_full_report(system_stats)
-                
+
                 if self.notifier.send_report(report):
                     logger.info("✅ Relatório enviado com sucesso")
                     self.last_report_time = time.time()
                 else:
                     logger.warning("⚠️ Falha ao enviar relatório")
-            
+
         except Exception as e:
             logger.error(f"❌ Erro durante checagem: {e}", exc_info=True)
     

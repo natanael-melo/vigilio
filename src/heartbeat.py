@@ -46,15 +46,17 @@ class Heartbeat:
         except:
             return "unknown_host"
     
-    def _build_payload(self, stats: Optional[Dict[str, Any]] = None, 
-                       extra_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _build_payload(self, stats: Optional[Dict[str, Any]] = None,
+                       extra_data: Optional[Dict[str, Any]] = None,
+                       swarm_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Constrói o payload do heartbeat
-        
+
         Args:
             stats: Estatísticas do sistema (opcional)
             extra_data: Dados adicionais para incluir (opcional)
-            
+            swarm_data: Dados do Docker Swarm (opcional)
+
         Returns:
             Payload formatado para n8n
         """
@@ -66,7 +68,7 @@ class Heartbeat:
             "total_sent": self.total_sent,
             "total_failed": self.total_failed
         }
-        
+
         # Adiciona estatísticas se fornecidas
         if stats:
             # Extrai apenas informações resumidas
@@ -76,27 +78,33 @@ class Heartbeat:
                 "disk_percent": stats.get("disk_percent", 0),
                 "uptime_seconds": stats.get("uptime_seconds", 0)
             }
-        
+
+        # Adiciona dados do Swarm se fornecidos
+        if swarm_data:
+            payload["swarm"] = swarm_data
+
         # Adiciona dados extras se fornecidos
         if extra_data:
             payload.update(extra_data)
-        
+
         return payload
     
-    def send(self, stats: Optional[Dict[str, Any]] = None, 
-             extra_data: Optional[Dict[str, Any]] = None) -> bool:
+    def send(self, stats: Optional[Dict[str, Any]] = None,
+             extra_data: Optional[Dict[str, Any]] = None,
+             swarm_data: Optional[Dict[str, Any]] = None) -> bool:
         """
         Envia um heartbeat para o n8n
-        
+
         Args:
             stats: Estatísticas do sistema (opcional)
             extra_data: Dados adicionais (opcional)
-            
+            swarm_data: Dados do Docker Swarm (opcional)
+
         Returns:
             True se enviado com sucesso, False caso contrário
         """
         try:
-            payload = self._build_payload(stats, extra_data)
+            payload = self._build_payload(stats, extra_data, swarm_data)
             
             logger.debug(f"Enviando heartbeat para n8n: {self.hostname}")
             
